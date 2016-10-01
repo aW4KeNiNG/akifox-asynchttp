@@ -93,6 +93,12 @@ using StringTools;
 		var errorMessage:String;
 	}
 
+    // Thread messages
+    private enum ThreadMessage
+    {
+        Completed(request:HttpRequest, time:Float, url:URL, headers:HttpHeaders, status:Int, content:Bytes, error:String);
+    }
+
 #else
 
 	#error "Platform not supported (yet!)\n
@@ -227,6 +233,7 @@ class AsyncHttp
 
 			if (request.async) {
 				// Asynchronous (with a new thread)
+                startMainThreadTimer();
 				var worker = Thread.create(httpViaSocket_Threaded);
 				worker.sendMessage(request);
 			} else {
@@ -267,6 +274,9 @@ class AsyncHttp
 
 	// ==========================================================================================
 	// Multi-thread version for neko, CPP + JAVA
+
+    private var _mainLoopTimer:Timer;
+    private var _mainThread:Thread;
 
 	private function httpViaSocket_Threaded() {
 		var request:HttpRequest = null;
@@ -571,8 +581,48 @@ class AsyncHttp
 		var time:Float = elapsedTime(start);
 
 		log('Response $status ($contentLength bytes in $time s)\n> ${request.method} $url',request.fingerprint);
-		this.callback(request,time,url,headers,status,content,errorMessage);
+        _mainThread.sendMessage(ThreadMessage.Completed(request, time, url, headers, status, content, errorMessage));
   }
+
+    private function startMainThreadTimer():Void
+    {
+        if(_mainLoopTimer == null)
+        {
+            _mainThread = Thread.current();
+            _mainLoopTimer = new Timer(0);
+            _mainLoopTimer.run = mainLoopWaitMessage;
+        }
+    }
+
+    private function stopMainThreadTimer():Void
+    {
+        if(_mainLoopTimer != null)
+        {
+            _mainThread = null;
+            _mainLoopTimer.stop();
+            _mainLoopTimer = null;
+        }
+    }
+
+    private function mainLoopWaitMessage():Void
+    {
+        while(true)
+        {
+            var msg = Thread.readMessage(false);
+            if(msg == null)
+                return;
+
+            switch(msg)
+            {
+                case ThreadMessage.Completed(request, time, url, headers, status, content, error):
+                    stopMainThreadTimer();
+                    callback(request, time, url, headers, status, content, error);
+
+                default:
+                    return;
+            }
+        }
+    }
 
   #elseif flash
 
