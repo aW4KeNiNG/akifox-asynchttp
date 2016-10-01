@@ -323,37 +323,34 @@ class AsyncHttp
 			if (!request.http11) httpVersion = "1.0";
 
 			try {
-				s.output.writeString('${request.method} ${url.resource}${url.querystring} HTTP/$httpVersion\r\n');
-				log('HTTP > ${request.method} ${url.resource}${url.querystring} HTTP/$httpVersion',request.fingerprint);
-				s.output.writeString('User-Agent: $userAgent\r\n');
-				log('HTTP > User-Agent: $userAgent',request.fingerprint);
-				s.output.writeString('Host: ${url.host}\r\n');
-				log('HTTP > Host: ${url.host}',request.fingerprint);
+                var buffer:Array<String> = [];
+                buffer.push('${request.method} ${request.url.resource} HTTP/$httpVersion');
+                log('HTTP > ${request.method} ${url.resource}${url.querystring} HTTP/$httpVersion',request.fingerprint);
+                buffer.push('User-Agent: $userAgent');
+                log('HTTP > User-Agent: $userAgent',request.fingerprint);
+                buffer.push('Host: ${request.url.host}:${request.url.port}');
+                log('HTTP > Host: ${url.host}',request.fingerprint);
+                if (request.headers!=null) {
+                    for (key in request.headers.keys()) {
+                        var value = request.headers.get(key);
+                        if (HttpHeaders.validateRequest(key)) {
+                            buffer.push('$key: $value');
+                            log('HTTP > $key: $value',request.fingerprint);
+                        }
+                    }
+                }
+                if(request.content != null)
+                {
+                    buffer.push('Content-Type: ${request.contentType}');
+                    log('HTTP > Content-Type: ${request.contentType}',request.fingerprint);
+                    buffer.push('Content-Length: ${request.content.length}');
+                    log('HTTP > Content-Length: '+request.content.length,request.fingerprint);
+                    buffer.push("");
+                    buffer.push(request.content.toString());
+                }
 
-				if (request.headers!=null) {
-					//custom headers
-					for (key in request.headers.keys()) {
-						var value = request.headers.get(key);
-						if (HttpHeaders.validateRequest(key)) {
-							s.output.writeString('$key: $value\r\n');
-							log('HTTP > $key: $value',request.fingerprint);
-						}
-					}
-				}
-
-				if (request.content!=null) {
-					s.output.writeString('Content-Type: ${request.contentType}\r\n');
-					log('HTTP > Content-Type: ${request.contentType}',request.fingerprint);
-					s.output.writeString('Content-Length: '+request.content.length+'\r\n');
-					log('HTTP > Content-Length: '+request.content.length,request.fingerprint);
-					s.output.writeString('\r\n');
-					if (request.contentIsBinary) {
-						s.output.writeBytes(cast(request.content,Bytes),0,request.content.length);
-					} else {
-						s.output.writeString(request.content.toString());
-					}
-				}
-				s.output.writeString('\r\n');
+                var bufferStr = buffer.join("\r\n") + "\r\n\r\n";
+                s.output.writeString(bufferStr);
 			} catch (msg:Dynamic) {
 				errorMessage = error('Request failed -> $msg',request.fingerprint);
 				status = 0;
