@@ -334,7 +334,7 @@ class AsyncHttp
 
 			try {
                 var buffer:Array<String> = [];
-                buffer.push('${request.method} ${request.url.resource} HTTP/$httpVersion');
+                buffer.push('${request.method} ${request.url.resource}${url.querystring} HTTP/$httpVersion');
                 log('HTTP > ${request.method} ${url.resource}${url.querystring} HTTP/$httpVersion',request.fingerprint);
                 buffer.push('User-Agent: $userAgent');
                 log('HTTP > User-Agent: $userAgent',request.fingerprint);
