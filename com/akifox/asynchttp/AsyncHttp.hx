@@ -226,7 +226,6 @@ class AsyncHttp
 
     private static function stopMainThreadTimer():Void
     {
-        //        trace(haxe.CallStack.toString(haxe.CallStack.callStack()));
         --_concurrentConnections;
         if(_concurrentConnections == 0 && _mainLoopTimer != null)
         {
