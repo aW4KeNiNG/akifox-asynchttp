@@ -96,7 +96,7 @@ using StringTools;
     // Thread messages
     private enum ThreadMessage
     {
-        Completed(request:HttpRequest, time:Float, url:URL, headers:HttpHeaders, status:Int, content:Bytes, error:String);
+        Completed(instance:AsyncHttp, request:HttpRequest, time:Float, url:URL, headers:HttpHeaders, status:Int, content:Bytes, errorMsg:String);
     }
 
 #else
@@ -206,6 +206,56 @@ class AsyncHttp
 		return message;
 	}
 
+    // ==========================================================================================
+
+    //Unique thread to manage multiple requests at the same time
+    private static var _concurrentConnections:Int = 0;
+    private static var _mainLoopTimer:Timer;
+    private static var _mainThread:Thread;
+
+    private static function startMainThreadTimer():Void
+    {
+        ++_concurrentConnections;
+        if(_mainLoopTimer == null)
+        {
+            _mainThread = Thread.current();
+            _mainLoopTimer = new Timer(0);
+            _mainLoopTimer.run = mainLoopWaitMessage;
+        }
+    }
+
+    private static function stopMainThreadTimer():Void
+    {
+        //        trace(haxe.CallStack.toString(haxe.CallStack.callStack()));
+        --_concurrentConnections;
+        if(_concurrentConnections == 0 && _mainLoopTimer != null)
+        {
+            _mainThread = null;
+            _mainLoopTimer.stop();
+            _mainLoopTimer = null;
+        }
+    }
+
+    private static function mainLoopWaitMessage():Void
+    {
+        while(true)
+        {
+            var msg = Thread.readMessage(false);
+            if(msg == null)
+                return;
+
+            switch(msg)
+            {
+                case ThreadMessage.Completed(instance, request, time, url, headers, status, content, errorMsg):
+                    stopMainThreadTimer();
+                    instance.callback(request, time, url, headers, status, content, errorMsg);
+
+                default:
+                    return;
+            }
+        }
+    }
+
 	// ==========================================================================================
 
 	@:dox(hide)
@@ -274,9 +324,6 @@ class AsyncHttp
 
 	// ==========================================================================================
 	// Multi-thread version for neko, CPP + JAVA
-
-    private var _mainLoopTimer:Timer;
-    private var _mainThread:Thread;
 
 	private function httpViaSocket_Threaded() {
 		var request:HttpRequest = null;
@@ -581,47 +628,7 @@ class AsyncHttp
 		var time:Float = elapsedTime(start);
 
 		log('Response $status ($contentLength bytes in $time s)\n> ${request.method} $url',request.fingerprint);
-        _mainThread.sendMessage(ThreadMessage.Completed(request, time, url, headers, status, content, errorMessage));
-  }
-
-    private function startMainThreadTimer():Void
-    {
-        if(_mainLoopTimer == null)
-        {
-            _mainThread = Thread.current();
-            _mainLoopTimer = new Timer(0);
-            _mainLoopTimer.run = mainLoopWaitMessage;
-        }
-    }
-
-    private function stopMainThreadTimer():Void
-    {
-        if(_mainLoopTimer != null)
-        {
-            _mainThread = null;
-            _mainLoopTimer.stop();
-            _mainLoopTimer = null;
-        }
-    }
-
-    private function mainLoopWaitMessage():Void
-    {
-        while(true)
-        {
-            var msg = Thread.readMessage(false);
-            if(msg == null)
-                return;
-
-            switch(msg)
-            {
-                case ThreadMessage.Completed(request, time, url, headers, status, content, error):
-                    stopMainThreadTimer();
-                    callback(request, time, url, headers, status, content, error);
-
-                default:
-                    return;
-            }
-        }
+        _mainThread.sendMessage(ThreadMessage.Completed(this, request, time, url, headers, status, content, errorMessage));
     }
 
   #elseif flash
