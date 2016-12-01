@@ -206,56 +206,9 @@ class AsyncHttp
 		return message;
 	}
 
-    // ==========================================================================================
-
-    //Unique thread to manage multiple requests at the same time
-    private static var _concurrentConnections:Int = 0;
-    private static var _mainLoopTimer:Timer;
-    private static var _mainThread:Thread;
-
-    private static function startMainThreadTimer():Void
-    {
-        ++_concurrentConnections;
-        if(_mainLoopTimer == null)
-        {
-            _mainThread = Thread.current();
-            _mainLoopTimer = new Timer(0);
-            _mainLoopTimer.run = mainLoopWaitMessage;
-        }
-    }
-
-    private static function stopMainThreadTimer():Void
-    {
-        --_concurrentConnections;
-        if(_concurrentConnections == 0 && _mainLoopTimer != null)
-        {
-            _mainThread = null;
-            _mainLoopTimer.stop();
-            _mainLoopTimer = null;
-        }
-    }
-
-    private static function mainLoopWaitMessage():Void
-    {
-        while(true)
-        {
-            var msg = Thread.readMessage(false);
-            if(msg == null)
-                return;
-
-            switch(msg)
-            {
-                case ThreadMessage.Completed(instance, request, time, url, headers, status, content, errorMsg):
-                    stopMainThreadTimer();
-                    instance.callback(request, time, url, headers, status, content, errorMsg);
-
-                default:
-                    return;
-            }
-        }
-    }
-
 	// ==========================================================================================
+
+    private var _worker:Worker;
 
 	@:dox(hide)
 	public function new()
@@ -282,9 +235,16 @@ class AsyncHttp
 
 			if (request.async) {
 				// Asynchronous (with a new thread)
-                startMainThreadTimer();
-				var worker = Thread.create(httpViaSocket_Threaded);
-				worker.sendMessage(request);
+                _worker = new Worker();
+                _worker.doWork = httpViaSocket_Threaded;
+                _worker.onComplete = _worker.onError = function(response:HttpResponse) {
+                    _worker = null;
+                    if (request.callbackError != null && !response.isOK)
+                        request.callbackError(response);
+                    else if (request.callback != null)
+                        request.callback(response);
+                };
+                _worker.run(request);
 			} else {
 				// Synchronous (same thread)
 				httpViaSocket(request);
@@ -305,18 +265,29 @@ class AsyncHttp
 	}
 
 	private inline function callback(request:HttpRequest,time:Float,url:URL,headers:HttpHeaders,status:Int,content:Bytes,?error:String="") {
-		headers.finalise(); // makes the headers object immutable
-		var response = new HttpResponse(request,time,url,headers,status,content,error);
+        headers.finalise(); // makes the headers object immutable
+        var response = new HttpResponse(request,time,url,headers,status,content,error);
 		if (request.callbackError!=null && !response.isOK) {
-			request.callbackError(response);
+            if(request.async)
+                _worker.sendError(response);
+            else
+			    request.callbackError(response);
 		} else if (request.callback!=null) {
-			request.callback(response);
+            if(request.async)
+                _worker.sendComplete(response);
+            else
+                request.callback(response);
 		}
 		response = null;
 	}
 
 	private inline function callbackProgress(request:HttpRequest, loaded:Int, total:Int):Void {
-		if (request.callbackProgress != null) request.callbackProgress(loaded,total);
+		if (request.callbackProgress != null) {
+            if(request.async && _worker != null)
+                _worker.sendProgress(loaded, total);
+            else
+                request.callbackProgress(loaded, total);
+        }
 	}
 
 	#if (neko || cpp || java)
@@ -324,10 +295,8 @@ class AsyncHttp
 	// ==========================================================================================
 	// Multi-thread version for neko, CPP + JAVA
 
-	private function httpViaSocket_Threaded() {
-		var request:HttpRequest = null;
+	private function httpViaSocket_Threaded(request:HttpRequest) {
 		try {
-			request = Thread.readMessage(true);
 			httpViaSocket(request);
 		} catch(error:String) {
 			// very unlikely it will fall in this case
@@ -627,7 +596,7 @@ class AsyncHttp
 		var time:Float = elapsedTime(start);
 
 		log('Response $status ($contentLength bytes in $time s)\n> ${request.method} $url',request.fingerprint);
-        _mainThread.sendMessage(ThreadMessage.Completed(this, request, time, url, headers, status, content, errorMessage));
+        callback(request, time, url, headers, status, content, errorMessage);
     }
 
   #elseif flash
