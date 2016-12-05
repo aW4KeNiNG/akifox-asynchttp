@@ -209,6 +209,7 @@ class AsyncHttp
 	// ==========================================================================================
 
     private var _worker:Worker;
+    private var _response:HttpResponse;
 
 	@:dox(hide)
 	public function new()
@@ -239,10 +240,11 @@ class AsyncHttp
                 _worker.doWork = httpViaSocket_Threaded;
                 _worker.onComplete = _worker.onError = function(response:HttpResponse) {
                     _worker = null;
-                    if (request.callbackError != null && !response.isOK)
-                        request.callbackError(response);
+                    if (request.callbackError != null && !_response.isOK)
+                        request.callbackError(_response);
                     else if (request.callback != null)
-                        request.callback(response);
+                        request.callback(_response);
+                    _response = null;
                 };
                 _worker.run(request);
 			} else {
@@ -266,19 +268,21 @@ class AsyncHttp
 
 	private inline function callback(request:HttpRequest,time:Float,url:URL,headers:HttpHeaders,status:Int,content:Bytes,?error:String="") {
         headers.finalise(); // makes the headers object immutable
-        var response = new HttpResponse(request,time,url,headers,status,content,error);
-		if (request.callbackError!=null && !response.isOK) {
+        _response = new HttpResponse(request,time,url,headers,status,content,error);
+		if (request.callbackError!=null && !_response.isOK) {
             if(request.async)
-                _worker.sendError(response);
+                _worker.sendError(_response);
             else
-			    request.callbackError(response);
+			    request.callbackError(_response);
 		} else if (request.callback!=null) {
             if(request.async)
-                _worker.sendComplete(response);
+                _worker.sendComplete(_response);
             else
-                request.callback(response);
+                request.callback(_response);
 		}
-		response = null;
+
+        if(!request.async)
+		    _response = null;
 	}
 
 	private inline function callbackProgress(request:HttpRequest, loaded:Int, total:Int):Void {
