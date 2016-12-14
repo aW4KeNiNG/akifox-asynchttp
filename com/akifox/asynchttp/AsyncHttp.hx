@@ -509,7 +509,6 @@ class AsyncHttp
                 mode = HttpTransferMode.UNDEFINED;
 			if (headers.get('transfer-encoding') == 'chunked') mode = HttpTransferMode.CHUNKED;
 			log('Transfer mode -> $mode',request.fingerprint);
-            log('Headers $headers');
 
 			var bytes_loaded:Int = 0;
 			var contentBytes:Bytes=null;
