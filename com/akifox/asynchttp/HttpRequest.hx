@@ -1,4 +1,5 @@
 package com.akifox.asynchttp;
+import haxe.io.Bytes;
 import com.akifox.asynchttp.AsyncHttp;
 
 /**
@@ -23,13 +24,15 @@ typedef HttpRequestOptions = {
   ? url: Dynamic,
   ? callback: HttpResponse->Void,
   ? callbackProgress: Int->Int->Void,
+  ? callbackProgressBytes: Bytes->Int->Int->Void,
   ? callbackError: HttpResponse->Void,
 	? headers : HttpHeaders,
 	? timeout : Int,
 	? method: String,
 	? content: Dynamic,
 	? contentType: String,
-	? contentIsBinary: Bool
+	? contentIsBinary: Bool,
+    ? maintainContentChunk: Bool     //only for transfer mode = chunked
 }
 
 /**
@@ -65,7 +68,7 @@ class HttpRequest
   * @param options  HttpRequestOptions object or null (**NOTE:** every parameter could be changed also after the class instance)
   **/
 	public function new(?options:HttpRequestOptions=null) {
-		_fingerprint = new AsyncHttp().randomUID(8); //make a random fingerprint to make this request unique
+		_fingerprint = AsyncHttp.randomUID(8); //make a random fingerprint to make this request unique
 
 		if(options != null) {
 			if(options.async != null)  async = options.async;
@@ -73,6 +76,7 @@ class HttpRequest
 			if(options.url != null)  url = options.url;
 			if(options.callback != null) callback = options.callback;
 			if(options.callbackProgress != null) callbackProgress = options.callbackProgress;
+			if(options.callbackProgressBytes != null) callbackProgressBytes = options.callbackProgressBytes;
 			if(options.callbackError != null)	callbackError = options.callbackError;
 			if(options.headers != null)	_headers = options.headers.clone(); // get a mutable copy of the headers
 			if(options.timeout != null)	timeout = options.timeout;
@@ -80,6 +84,7 @@ class HttpRequest
 			if(options.content != null)	content = options.content;
 			if(options.contentType != null)	contentType = options.contentType;
 			if(options.contentIsBinary != null)	contentIsBinary = options.contentIsBinary;
+			if(options.maintainContentChunk != null)	maintainContentChunk = options.maintainContentChunk;
 		}
 	}
 
@@ -340,6 +345,22 @@ class HttpRequest
 	}
 
   /**
+  * Content as stream. For download purpose. Only useful if the transfer mode is chunked
+  */
+    public var maintainContentChunk(get,set):Bool;
+    private var _maintainContentChunk:Bool=true;
+    private function get_maintainContentChunk():Bool {
+        return _maintainContentChunk;
+    }
+    private function set_maintainContentChunk(value:Bool):Bool {
+        if (_finalised) {
+            AsyncHttp.error('HttpRequest.maintainContentChunk -> Can\'t modify a property when the instance is already sent', _fingerprint, true);
+            return _maintainContentChunk;
+        }
+        return _maintainContentChunk = value;
+    }
+
+  /**
   * The callback function to be called when the response returns
   *
   * **NOTE:** This will be called always if no `callbackError` is set
@@ -394,4 +415,20 @@ class HttpRequest
 		return _callbackProgress = value;
 	}
 
+    /**
+  * The callbackProgress function to be called when get a block on transfer mode FIXED
+  * Otherwise it will be called only if the response is valid
+  **/
+    public var callbackProgressBytes(get,set):Bytes->Int->Int->Void;
+    private var _callbackProgressBytes:Bytes->Int->Int->Void=null;
+    private function get_callbackProgressBytes():Bytes->Int->Int->Void {
+        return _callbackProgressBytes;
+    }
+    private function set_callbackProgressBytes(value:Bytes->Int->Int->Void):Bytes->Int->Int->Void {
+        if (_finalised) {
+            AsyncHttp.error('HttpRequest.callbackProgress -> Can\'t modify a property when the instance is already sent', _fingerprint, true);
+            return _callbackProgressBytes;
+        }
+        return _callbackProgressBytes = value;
+    }
 }

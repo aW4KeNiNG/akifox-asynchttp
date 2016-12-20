@@ -17,6 +17,7 @@ to handle HTTP+HTTPS requests with a common API.
  * https://gist.github.com/raivof/dcdb1d74f93d17132a1e
  */
 
+import haxe.io.Bytes;
 import haxe.Timer;
 import haxe.io.Bytes;
 
@@ -247,6 +248,13 @@ class AsyncHttp
                         request.callback(_response);
                     _response = null;
                 };
+                _worker.onProgress = function(bytes:Bytes, current:Int, total:Int) {
+                    if(request.callbackProgress != null)
+                        request.callbackProgress(current, total);
+
+                    if(request.callbackProgressBytes != null)
+                        request.callbackProgressBytes(bytes, current, total);
+                };
                 _worker.run(request);
 			} else {
 				// Synchronous (same thread)
@@ -271,12 +279,12 @@ class AsyncHttp
         headers.finalise(); // makes the headers object immutable
         _response = new HttpResponse(request,time,url,headers,status,content,error);
 		if (request.callbackError!=null && !_response.isOK) {
-            if(request.async)
+            if(request.async && _worker != null)
                 _worker.sendError(_response);
             else
 			    request.callbackError(_response);
 		} else if (request.callback!=null) {
-            if(request.async)
+            if(request.async && _worker != null)
                 _worker.sendComplete(_response);
             else
                 request.callback(_response);
@@ -286,12 +294,17 @@ class AsyncHttp
 		    _response = null;
 	}
 
-	private inline function callbackProgress(request:HttpRequest, loaded:Int, total:Int):Void {
-		if (request.callbackProgress != null) {
+	private inline function callbackProgress(request:HttpRequest, bytes:Bytes, loaded:Int, total:Int):Void {
+		if (request.callbackProgress != null || request.callbackProgressBytes != null) {
             if(request.async && _worker != null)
-                _worker.sendProgress(loaded, total);
-            else
-                request.callbackProgress(loaded, total);
+                _worker.sendProgress(bytes, loaded, total);
+            else {
+                if(request.callbackProgress != null)
+                    request.callbackProgress(loaded, total);
+
+                if(request.callbackProgressBytes != null)
+                    request.callbackProgressBytes(bytes, loaded, total);
+            }
         }
 	}
 
@@ -512,7 +525,7 @@ class AsyncHttp
 
 			var bytes_loaded:Int = 0;
 			var contentBytes:Bytes=null;
-			this.callbackProgress(request, 0, -1);
+			this.callbackProgress(request, null, 0, -1);
 
 			switch(mode) {
 				case HttpTransferMode.UNDEFINED:
@@ -525,7 +538,7 @@ class AsyncHttp
 						contentBytes = Bytes.alloc(0);
 					}
 					contentLength = contentBytes.length;
-					this.callbackProgress(request, contentLength, contentLength);
+					this.callbackProgress(request, contentBytes, contentLength, contentLength);
 				  log('Loaded $contentLength/$contentLength bytes (100%)',request.fingerprint);
 
 				case HttpTransferMode.FIXED:
@@ -552,7 +565,7 @@ class AsyncHttp
 			      bytes_left -= actual_block_len;
 
 			      bytes_loaded += actual_block_len;
-				    this.callbackProgress(request, bytes_loaded, contentLength);
+				    this.callbackProgress(request, contentBytes, bytes_loaded, contentLength);
 			      log('Loaded $bytes_loaded/$contentLength bytes (' + Math.round(bytes_loaded / contentLength * 1000) / 10 + '%)',request.fingerprint);
 			    }
 
@@ -570,9 +583,10 @@ class AsyncHttp
 							if (chunk==0) break;
 							bytes = s.input.read(chunk);
 							bytes_loaded += chunk;
-							buffer.add(bytes);
+                            if(request.maintainContentChunk)
+							    buffer.add(bytes);
 							s.input.read(2); // \n\r between chunks = 2 bytes
-					    this.callbackProgress(request, bytes_loaded, -1);
+					    this.callbackProgress(request, bytes, bytes_loaded, -1);
 							log('Loaded $bytes_loaded bytes (Total unknown)',request.fingerprint);
 						}
 					} catch(msg:Dynamic) {
@@ -829,7 +843,7 @@ class AsyncHttp
 	private static var UID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 	@:dox(hide)
-	public function randomUID(?size:Int=32):String
+	public static function randomUID(?size:Int=32):String
 	{
 		var nchars = UID_CHARS.length;
 		var uid = new StringBuf();

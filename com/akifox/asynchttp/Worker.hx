@@ -1,6 +1,7 @@
 package com.akifox.asynchttp;
 
 #if cpp
+import haxe.io.Bytes;
 import cpp.vm.Deque;
 import cpp.vm.Thread;
 #elseif neko
@@ -15,6 +16,7 @@ class Worker {
 
     private static var MESSAGE_COMPLETE = "__COMPLETE__";
     private static var MESSAGE_ERROR = "__ERROR__";
+    private static var MESSAGE_PROGRESS = "__PROGRESS__";
 
     #if (cpp || neko || java)
 
@@ -74,9 +76,9 @@ class Worker {
                     onComplete(_messageQueue.pop(false));
                 }
             }
-            else if (!canceled)
+            else if (message == MESSAGE_PROGRESS && !canceled)
             {
-                onProgress(message, _messageQueue.pop(false));
+                onProgress(_messageQueue.pop(false), _messageQueue.pop(false), _messageQueue.pop(false));
             }
         }
     }
@@ -87,7 +89,7 @@ class Worker {
     public dynamic function doWork(message:Dynamic):Void {}
     public dynamic function onComplete(message:Dynamic):Void {}
     public dynamic function onError(message:Dynamic):Void {}
-    public dynamic function onProgress(current:Int, total:Int):Void {}
+    public dynamic function onProgress(bytes:Bytes, current:Int, total:Int):Void {}
 
     private var _runMessage:Dynamic;
 
@@ -170,10 +172,12 @@ class Worker {
         #end
     }
 
-    public function sendProgress(current:Int, total:Int):Void
+    public function sendProgress(bytes:Bytes, current:Int, total:Int):Void
     {
         #if (cpp || neko || java)
 
+        _messageQueue.add(MESSAGE_PROGRESS);
+        _messageQueue.add (bytes);
         _messageQueue.add (current);
         _messageQueue.add (total);
 
@@ -181,7 +185,7 @@ class Worker {
 
         if (!canceled)
         {
-            onProgress(current, total);
+            onProgress(bytes, current, total);
         }
 
         #end
