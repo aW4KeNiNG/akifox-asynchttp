@@ -536,7 +536,7 @@ class AsyncHttp {
             contentBytes = Bytes.alloc(0);
           }
           contentLength = contentBytes.length;
-          this.callbackProgress(request, contentLength, contentLength);
+          this.callbackProgress(request, contentBytes, contentLength, contentLength);
           log('Loaded $contentLength/$contentLength bytes (100%)', request.fingerprint);
 
         case HttpTransferMode.FIXED:
@@ -848,7 +848,7 @@ class AsyncHttp {
   var UID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
   @:dox(hide)
-  public function randomUID( ?size:Int = 32):String {
+  public static function randomUID( ?size:Int = 32):String {
     var nchars = UID_CHARS.length;
     var uid = new StringBuf();
     for (i in 0...size) {
