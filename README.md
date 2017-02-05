@@ -1,9 +1,9 @@
-[![akifox-asynchttp](https://img.shields.io/badge/library-akifox%20asynchttp%200.4.3-brightgreen.svg)]()
+[![akifox-asynchttp](https://img.shields.io/badge/library-akifox%20asynchttp%200.4.7-brightgreen.svg)]()
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Haxe 3](https://img.shields.io/badge/language-Haxe%203-orange.svg)](http://www.haxe.org)
+[![Haxe 3](https://img.shields.io/badge/language-Haxe%203.3+-orange.svg)](http://www.haxe.org)
 
 [![Library](https://img.shields.io/badge/type-haxelib%20library-orange.svg)](http://lib.haxe.org/p/akifox-asynchttp)
-[![Haxelib](https://img.shields.io/badge/distr-v0.4.3-yellow.svg)](http://lib.haxe.org/p/akifox-asynchttp)
+[![Haxelib](https://img.shields.io/badge/distr-v0.4.7-yellow.svg)](http://lib.haxe.org/p/akifox-asynchttp)
 
 ## BREAKING API VERSION 0.4
 If you were using akifox-asynchttp, please check what have changed in the new version 0.4 and update your code as explained [here](CHANGELOG.md#whats-new-040-breaking-api)
@@ -47,17 +47,16 @@ import com.akifox.asynchttp.*;
 ```
 
 compile with
-```-lib akifox-asynchttp```
-
-and add the hxssl library (only needed on NEKO/CPP) to have SSL support
-```-lib hxssl```
+```
+-lib akifox-asynchttp
+```
 
 ### Use it in OpenFL Projects
+
 After installing the library via Haxelib, add the library reference in your ```project.xml```
 
 ```
 <haxelib name="akifox-asynchttp" />
-<haxelib name="hxssl" />
 ```
 
 and finally you can import it in your project files
@@ -73,8 +72,9 @@ import com.akifox.asynchttp.*;
   - [ ] More platforms (php, python...)? Post a [ticket](https://github.com/yupswing/akifox-asynchttp/issues) if you would like one
 - HTTP Protocol Support
   - Request methods
-    - [x] Support standard methods (GET, POST)
-    - [x] Support restful methods (PUT, DELETE)
+    - [x] Support for standard methods (GET, POST)
+    - [x] Support for restful methods (PUT, DELETE) (Javascript target unsupported)
+    - [x] Library accepts any method (HEAD, CONNECT, OPTIONS, TRACE, PATCH...) (Javascript target unsupported) **[v0.4.7+]**
   - Transfer modes
     - [x] Support unknown transfer mode (HTTP/1.0+)
     - [x] Support fixed content-length transfer mode (HTTP/1.0+)
@@ -94,8 +94,8 @@ import com.akifox.asynchttp.*;
 - Additional features
   - [x] Synchronous request option **[v0.4+]**
   - [x] Progress callback **[v0.4.3+]**
+  - [x] Support SSL for iOS and Android **[v0.4.4+]**
 - Future releases
-  - [ ] Support SSL for iOS and Android (need to make [hxssl](https://github.com/tong/hxssl) NDLLs for those platform)
   - [ ] Posting content on request (it should work but needs extensive tests)
   - [ ] Chain requests (one thread multiple requests)
   - [ ] Test socket solution on Flash target (it could be better than URLLoader)
@@ -116,7 +116,7 @@ import com.akifox.asynchttp.*;
 - *response.isBinary* is always FALSE on the response object
 - *response.headers* is always empty, so don't rely on *response.contentType*
 - you have to know what you are going to fetch to parse it as you need (toText(), toJson(), toXml()...)
-- no support for methods PUT and DELETE
+- *no support* for methods other than POST and GET (limited by haxe.Http request)
 
 ## Documentation
 
@@ -296,7 +296,7 @@ var request = new HttpRequest({
       },
 
   // HttpMethod | The request http method
-  // Values are GET (default), POST, PUT or DELETE
+  // String (constants helper in HttpMethod class)
   // NOTE: Only GET and POST are supported in Javascript
   method : HttpMethod.GET,
 
@@ -347,6 +347,11 @@ newRequest.send();
 
 ## Examples
 
+### One example
+[Check it out](/samples/one/)
+
+The example shows loading an wikipedia page (with redirect from http to https and so also SSL support).
+
 ### Simple example with concurrent multiple requests
 [Check it out](/samples/simple/)
 
@@ -356,11 +361,6 @@ The example shows how to handle multiple requests and responses
 [Check it out](/samples/interactive/)
 
 The example allow the user to try any URL to see the behavior of the library with redirects, errors and his own urls.
-
-### SSL example
-[Check it out](/samples/ssl/)
-
-The example shows the seamless SSL support (the only difference between HTTP and HTTPS is in the URL).
 
 ### Javascript example
 [Check it out](/samples/javascript/)
@@ -381,8 +381,13 @@ A simple example to show the callbackProgress optional callback
 [Check it out](/samples/openfl/)
 
 The example shows how to load a picture from an URL and display it on stage as Bitmap
+(The HAXE logo is loaded via HTTPS the other two images via HTTP)
+
+It supports most of the targets (for sure neko, android and ios)
 
 NOTE: This example works only with OpenFL because it supports decoding of images (Jpeg, PNG and GIF) from raw bytes data.
+
+Also, you can use the library to load any kind of data, not just images, exactly like in the other examples.
 
 ## Write to a file the response
 If you want to write in a file the response content you can use this snippet.
