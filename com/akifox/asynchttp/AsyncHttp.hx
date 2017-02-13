@@ -110,7 +110,13 @@ private enum HttpTransferMode {
   UNDEFINED;
   FIXED;
   CHUNKED;
+  MULTIPART_MIXED_REPLACE;
   NO_CONTENT;
+}
+
+@:enum
+private abstract MultipartType(String) from String to String {
+  var MIXED_REPLACE = "x-mixed-replace";
 }
 
 @:dox(hide)
@@ -517,7 +523,24 @@ class AsyncHttp {
       if (contentLength > 0)
         mode = HttpTransferMode.FIXED;
       else if(status < 400)
-        mode = HttpTransferMode.UNDEFINED;
+      {
+        var multipartRE = ~/multipart\/([\w-]+);\s?boundary=([\w-]+)/i;
+        if(multipartRE.match(headers.get('content-type')))
+        {
+          switch(multipartRE.matched(1).toLowerCase())
+          {
+            case MultipartType.MIXED_REPLACE:
+              mode = HttpTransferMode.MULTIPART_MIXED_REPLACE;
+
+            default:
+              mode = HttpTransferMode.UNDEFINED;
+          }
+        }
+        else
+        {
+          mode = HttpTransferMode.UNDEFINED;
+        }
+      }
       if (headers.get('transfer-encoding') == 'chunked') mode = HttpTransferMode.CHUNKED;
       log('Transfer mode -> $mode', request.fingerprint);
 
@@ -580,7 +603,7 @@ class AsyncHttp {
 							if (chunk==0) break;
 							bytes = s.input.read(chunk);
 							bytes_loaded += chunk;
-                            if(request.maintainContentChunk)
+              if(request.maintainContentChunk)
 							    buffer.add(bytes);
 							s.input.read(2); // \n\r between chunks = 2 bytes
 					    this.callbackProgress(request, bytes, bytes_loaded, -1);
@@ -597,6 +620,66 @@ class AsyncHttp {
 
           buffer = null;
           bytes = null;
+
+        case HttpTransferMode.MULTIPART_MIXED_REPLACE:
+          var bytes:Bytes;
+          var multipartRE = ~/multipart\/([\w-]+);\s?boundary=([\w-]+)/i;
+          multipartRE.match(headers.get('content-type'));
+          var boundary:String = multipartRE.matched(2);
+          var ln:String;
+          try {
+            while(!request.closed)
+            {
+              //READ HEADERS
+              var multipartHeaders:HttpHeaders = null;
+              while ((ln = s.input.readLine().trim()) != "") {
+                if(ln == boundary)
+                {
+                  multipartHeaders = new HttpHeaders();
+                  continue;
+                }
+                var a = ln.split(':');
+                var key = a.shift().toLowerCase();
+                multipartHeaders.add(key, a.join(':').trim());
+              }
+              //END READ HEADERS
+
+              if(multipartHeaders == null)
+                continue;
+
+              //READ CONTENT
+              contentLength = Std.parseInt(multipartHeaders.get('content-length'));
+              contentBytes = Bytes.alloc(contentLength);
+              var block_len = 1024 * 1024; // BLOCK SIZE:small value (like 64 KB) causes slow download
+              var nblocks = Math.ceil(contentLength / block_len);
+              var bytes_left = contentLength;
+              bytes_loaded = 0;
+
+              for (i in 0...nblocks) {
+                var actual_block_len = (bytes_left > block_len) ? block_len : bytes_left;
+                s.input.readFullBytes(contentBytes, bytes_loaded, actual_block_len);
+                bytes_left -= actual_block_len;
+
+                bytes_loaded += actual_block_len;
+                this.callbackProgress(request, contentBytes, bytes_loaded, contentLength);
+                log('Loaded $bytes_loaded/$contentLength bytes (' + Math.round(bytes_loaded / contentLength * 1000) / 10 + '%)',request.fingerprint);
+              }
+              //END READ CONTENT
+
+              content = contentBytes;
+              contentBytes = null;
+
+              if(!request.closed)
+              {
+                this.callback(request, elapsedTime(start), url, multipartHeaders, status, content, errorMessage);
+                start = Timer.stamp();
+              }
+            }
+          } catch(msg:Dynamic) {
+            errorMessage = error('Transfer failed -> $msg',request.fingerprint);
+            status = 0;
+            contentBytes = Bytes.alloc(0);
+          }
 
         case HttpTransferMode.NO_CONTENT:
           errorMessage = error('Transfer failed -> No content');
@@ -615,10 +698,13 @@ class AsyncHttp {
       s = null;
     }
 
-    var time:Float = elapsedTime(start);
+    if(!request.closed)
+    {
+      var time:Float = elapsedTime(start);
 
-    log('Response $status ($contentLength bytes in $time s)\n> ${request.method} $url', request.fingerprint);
-    this.callback(request, time, url, headers, status, content, errorMessage);
+      log('Response $status ($contentLength bytes in $time s)\n> ${request.method} $url', request.fingerprint);
+      this.callback(request, time, url, headers, status, content, errorMessage);
+    }
   }
 
 #elseif flash

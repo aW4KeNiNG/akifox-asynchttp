@@ -32,7 +32,7 @@ typedef HttpRequestOptions = {
 	? content: Dynamic,
 	? contentType: String,
 	? contentIsBinary: Bool,
-    ? maintainContentChunk: Bool     //only for transfer mode = chunked
+  ? maintainContentChunk: Bool     //only for transfer mode = chunked
 }
 
 /**
@@ -57,6 +57,15 @@ class HttpRequest {
   private var _finalised:Bool = false; //it was .sent at least once (no edit allowed)
   private function get_finalised():Bool {
     return _finalised;
+  }
+
+  /**
+   * Tell if the instance is closed because the user has canceled it.
+   **/
+  public var closed(get, never):Bool;
+  private var _closed:Bool = false;
+  private function get_closed():Bool {
+    return _closed;
   }
 
   // ==========================================================================================
@@ -125,6 +134,10 @@ class HttpRequest {
   public function finalise() {
     _headers.finalise(); // makes the headers object immutable
     _finalised = true; // it will not change
+  }
+
+  public function close() {
+    _closed = true;
   }
 
   // ==========================================================================================
