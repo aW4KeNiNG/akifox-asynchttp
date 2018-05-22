@@ -369,28 +369,35 @@ class AsyncHttp {
 			try {
                 var buffer:Array<String> = [];
                 buffer.push('${request.method} ${request.url.resource}${url.querystring} HTTP/$httpVersion');
-                log('HTTP > ${request.method} ${url.resource}${url.querystring} HTTP/$httpVersion',request.fingerprint);
                 buffer.push('User-Agent: $userAgent');
-                log('HTTP > User-Agent: $userAgent',request.fingerprint);
-                buffer.push('Host: ${request.url.host}:${request.url.port}');
-                log('HTTP > Host: ${url.host}',request.fingerprint);
+                if (url.port == 80)
+                {
+                    buffer.push('Host: ${url.host}');
+                }
+                else
+                {
+                    buffer.push('Host: ${url.host}:${url.port}');
+                }
+
                 if (request.headers!=null) {
                     for (key in request.headers.keys()) {
                         var value = request.headers.get(key);
                         if (HttpHeaders.validateRequest(key)) {
                             buffer.push('$key: $value');
-                            log('HTTP > $key: $value',request.fingerprint);
                         }
                     }
                 }
                 if(request.content != null)
                 {
                     buffer.push('Content-Type: ${request.contentType}');
-                    log('HTTP > Content-Type: ${request.contentType}',request.fingerprint);
                     buffer.push('Content-Length: ${request.content.length}');
-                    log('HTTP > Content-Length: '+request.content.length,request.fingerprint);
+                    log('HTTP > ${buffer.join("\r\n")}',request.fingerprint);
                     buffer.push("");
                     buffer.push(request.content.toString());
+                }
+                else
+                {
+                    log('HTTP > ${buffer.join("\r\n")}',request.fingerprint);
                 }
 
                 var bufferStr = buffer.join("\r\n") + "\r\n\r\n";
