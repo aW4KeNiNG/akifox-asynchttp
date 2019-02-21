@@ -166,6 +166,7 @@ class AsyncHttp {
    **/
   public static var logEnabled:Bool = #if debug true #else false #end;
   public static var logErrorEnabled:Bool = true;
+  public static var logFunction:Dynamic->?haxe.PosInfos->Void = haxe.Log.trace;
 
   /**
    * Deprecated and ignored (will be dropped in 0.5) #TODO
@@ -196,7 +197,7 @@ class AsyncHttp {
   @:dox(hide)
   public static inline function log(message:String, fingerprint:String = ''):String {
     if (AsyncHttp.logEnabled) {
-      trace('${fingerprint} INFO:${message}');
+      logFunction('${fingerprint} INFO:${message}');
     }
     return message;
   }
@@ -205,7 +206,7 @@ class AsyncHttp {
   @:dox(hide)
   public static inline function error(message:String, fingerprint:String = '', throwError:Bool = false):String {
     if (AsyncHttp.logErrorEnabled) {
-      trace('${fingerprint} ERROR:${message}');
+      logFunction('${fingerprint} ERROR:${message}');
     }
     if (throwError) throw 'AsyncHttp Error:${message}';
     return message;

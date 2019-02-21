@@ -1,7 +1,6 @@
 package com.akifox.asynchttp;
 
 #if cpp
-import haxe.io.Bytes;
 import cpp.vm.Deque;
 import cpp.vm.Thread;
 #elseif neko
@@ -11,6 +10,8 @@ import neko.vm.Thread;
 import java.vm.Deque;
 import java.vm.Thread;
 #end
+
+import haxe.io.Bytes;
 
 class Worker {
 

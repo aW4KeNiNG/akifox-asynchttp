@@ -15,7 +15,7 @@ This class represents an Http header collection and it is used by the library to
 
 class HttpHeaders {
 
-  private static var FORBIDDEN_ON_REQUEST = ["user-agent", "host", "content-type", "content-length"];
+  private static var FORBIDDEN_ON_REQUEST = ["user-agent", "host", "content-type"];
 
   private var _headers:Map<String,String> = new Map<String,String>();
 
