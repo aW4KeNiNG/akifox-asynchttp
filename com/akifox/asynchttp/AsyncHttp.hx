@@ -169,6 +169,11 @@ class AsyncHttp {
   public static var logFunction:Dynamic->?haxe.PosInfos->Void = haxe.Log.trace;
 
   /**
+   * Disable async mode even if async is set to true in the request
+   **/
+  public static var disableAsync:Bool = false;
+
+  /**
    * Deprecated and ignored (will be dropped in 0.5) #TODO
    **/
   public static var errorSafe:Bool = false;
@@ -235,6 +240,9 @@ class AsyncHttp {
         request.fingerprint, true); // throw error!
       return;
     }
+
+    if(disableAsync)
+      request.async = false;
 
     request.finalise(); // request will not change
 
@@ -573,15 +581,15 @@ class AsyncHttp {
         case HttpTransferMode.FIXED:
 
           // KNOWN CONTENT LENGTH
-
-          contentBytes = Bytes.alloc(contentLength);
           var block_len = 1024 * 1024; // BLOCK SIZE:small value (like 64 KB) causes slow download
           var nblocks = Math.ceil(contentLength / block_len);
           var bytes_left = contentLength;
+          var bufferSize:Int = request.downloadAsStream ? (block_len < contentLength ? block_len : contentLength) : contentLength;
+          contentBytes = Bytes.alloc(bufferSize);
           bytes_loaded = 0;
 
           for (i in 0...nblocks) {
-            var actual_block_len = (bytes_left > block_len)?block_len:bytes_left;
+            var actual_block_len = (bytes_left > block_len) ? block_len : bytes_left;
             try {
               s.input.readFullBytes(contentBytes, bytes_loaded, actual_block_len);
             } catch (msg:Dynamic) {
@@ -592,9 +600,14 @@ class AsyncHttp {
             }
             bytes_left -= actual_block_len;
 
-            bytes_loaded += actual_block_len;
+            if(!request.downloadAsStream)
+              bytes_loaded += actual_block_len;
+
             this.callbackProgress(request, contentBytes, bytes_loaded, contentLength);
             log('Loaded $bytes_loaded/$contentLength bytes (' + Math.round(bytes_loaded / contentLength * 1000) / 10 + '%)',request.fingerprint);
+
+            if(request.downloadAsStream)
+              contentBytes = Bytes.alloc((bytes_left > block_len) ? block_len : bytes_left);
           }
 
         case HttpTransferMode.CHUNKED:
@@ -611,7 +624,7 @@ class AsyncHttp {
 							if (chunk==0) break;
 							bytes = s.input.read(chunk);
 							bytes_loaded += chunk;
-              if(request.maintainContentChunk)
+              if(!request.downloadAsStream)
 							    buffer.add(bytes);
 							s.input.read(2); // \n\r between chunks = 2 bytes
 					    this.callbackProgress(request, bytes, bytes_loaded, -1);

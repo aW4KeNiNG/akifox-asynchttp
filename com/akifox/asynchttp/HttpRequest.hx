@@ -32,7 +32,7 @@ typedef HttpRequestOptions = {
 	? content: Dynamic,
 	? contentType: String,
 	? contentIsBinary: Bool,
-  ? maintainContentChunk: Bool     //only for transfer mode = chunked
+  ? downloadAsStream: Bool     //only for transfer mode = chunked
 }
 
 /**
@@ -92,7 +92,7 @@ class HttpRequest {
 			if(options.content != null)	content = options.content;
 			if(options.contentType != null)	contentType = options.contentType;
 			if(options.contentIsBinary != null)	contentIsBinary = options.contentIsBinary;
-			if(options.maintainContentChunk != null)	maintainContentChunk = options.maintainContentChunk;
+			if(options.downloadAsStream != null)	downloadAsStream = options.downloadAsStream;
 		}
 	}
 
@@ -358,19 +358,19 @@ class HttpRequest {
   }
 
   /**
-  * Content as stream. For download purpose. Only useful if the transfer mode is chunked
+  * Content as stream. For download purpose.
   */
-    public var maintainContentChunk(get,set):Bool;
-    private var _maintainContentChunk:Bool=true;
-    private function get_maintainContentChunk():Bool {
-        return _maintainContentChunk;
+    public var downloadAsStream(get,set):Bool;
+    private var _downloadAsStream:Bool=false;
+    private function get_downloadAsStream():Bool {
+        return _downloadAsStream;
     }
-    private function set_maintainContentChunk(value:Bool):Bool {
+    private function set_downloadAsStream(value:Bool):Bool {
         if (_finalised) {
-            AsyncHttp.error('HttpRequest.maintainContentChunk -> Can\'t modify a property when the instance is already sent', _fingerprint, true);
-            return _maintainContentChunk;
+            AsyncHttp.error('HttpRequest.downloadAsStream -> Can\'t modify a property when the instance is already sent', _fingerprint, true);
+            return _downloadAsStream;
         }
-        return _maintainContentChunk = value;
+        return _downloadAsStream = value;
     }
 
   /**
