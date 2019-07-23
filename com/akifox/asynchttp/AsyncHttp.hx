@@ -954,12 +954,16 @@ class AsyncHttp {
   private static
   var UID_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
+  private static var RANDOM_ID:Int = 0;
+
   @:dox(hide)
   public static function randomUID( ?size:Int = 32):String {
     var nchars = UID_CHARS.length;
     var uid = new StringBuf();
+    if(++RANDOM_ID > nchars)
+      RANDOM_ID = 0;
     for (i in 0...size) {
-      uid.addChar(UID_CHARS.charCodeAt(Std.random(nchars)));
+      uid.addChar(UID_CHARS.charCodeAt((Std.random(nchars) + RANDOM_ID) % nchars));
     }
     return uid.toString();
   }
