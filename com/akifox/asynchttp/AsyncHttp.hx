@@ -377,7 +377,7 @@ class AsyncHttp {
 
 			try {
                 var buffer:Array<String> = [];
-                buffer.push('${request.method} ${request.url.resource}${url.querystring} HTTP/$httpVersion');
+                buffer.push('${request.method} ${encodeResource(request.url.resource)}${encodeQuery(url.querystring)} HTTP/$httpVersion');
                 buffer.push('User-Agent: $userAgent');
                 if (url.port == 80)
                 {
@@ -421,6 +421,7 @@ class AsyncHttp {
 			}
 
     } // -- END REQUEST
+
 
     // -- START RESPONSE
     if (connected) {
@@ -944,6 +945,14 @@ class AsyncHttp {
   public static function determineIsBinary(contentKind:ContentKind):Bool {
     if (contentKind == ContentKind.BYTES || contentKind == ContentKind.IMAGE) return true;
     return false;
+  }
+
+  private static function encodeResource(resource:String):String {
+    return [for (v in resource.split("/")) StringTools.urlEncode(v)].join("/");
+  }
+
+  private static function encodeQuery(query:String):String {
+    return "?" + StringTools.replace([for (v in query.substr(1).split("&")) StringTools.urlEncode(v)].join("&"), "%3D", "=");
   }
 
   // ==========================================================================================
