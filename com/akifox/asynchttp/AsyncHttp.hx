@@ -952,7 +952,7 @@ class AsyncHttp {
   }
 
   private static function encodeQuery(query:String):String {
-    return "?" + StringTools.replace([for (v in query.substr(1).split("&")) StringTools.urlEncode(v)].join("&"), "%3D", "=");
+    return query.length == 0 ? "" : "?" + StringTools.replace([for (v in query.substr(1).split("&")) StringTools.urlEncode(v)].join("&"), "%3D", "=");
   }
 
   // ==========================================================================================
